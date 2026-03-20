@@ -166,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (newStatus === 'abholbereit' && customerEmail) {
       try {
         await resend.emails.send({
-          from: `${werkstattName} <noreply@ki-einbau.de>`,
+          from: `${werkstattName} <${process.env.RESEND_FROM_EMAIL ?? 'noreply@ki-einbau.de'}>`,
           to: customerEmail,
           subject: `Ihr Fahrzeug ${kennzeichen} ist abholbereit`,
           html: getPickupReadyEmail(customerName, kennzeichen, werkstattName),
@@ -182,7 +182,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (newStatus === 'abgeholt' && customerEmail && tenantGoogleReviewUrl) {
       try {
         await resend.emails.send({
-          from: `${werkstattName} <noreply@ki-einbau.de>`,
+          from: `${werkstattName} <${process.env.RESEND_FROM_EMAIL ?? 'noreply@ki-einbau.de'}>`,
           to: customerEmail,
           subject: `Wie war Ihre Erfahrung bei ${werkstattName}?`,
           html: getReviewEmail(customerName, kennzeichen, werkstattName, tenantGoogleReviewUrl),
