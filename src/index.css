@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f0f11;
+  --card: #1a1a1c;
+  --card-hover: #202024;
+  --border: #2a2a2e;
+  --primary: #f59e0b;
+  --primary-hover: #d97706;
+  --primary-foreground: #0f0f11;
+  --foreground: #e8e8e8;
+  --muted: #6b6b78;
+  --muted-foreground: #9b9ba8;
+  --destructive: #ef4444;
+  --success: #22c55e;
+  --radius: 8px;
+
+  /* Status colors */
+  --status-annahme: #3b82f6;
+  --status-diagnose: #eab308;
+  --status-teile-bestellt: #f97316;
+  --status-teile-da: #a855f7;
+  --status-reparatur: #ef4444;
+  --status-abholbereit: #22c55e;
+  --status-abgeholt: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(245, 158, 11, 0.3);
+  color: var(--foreground);
+}
