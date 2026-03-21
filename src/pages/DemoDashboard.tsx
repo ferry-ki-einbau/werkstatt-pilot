@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Wrench, Phone, CheckCircle2, Clock, CalendarDays, List,
-  ChevronRight, ChevronDown, Plus, Car,
+  Wrench, Phone, Clock, CalendarDays, List,
+  ChevronRight, ChevronDown, Plus,
   MessageSquare, ArrowRight, X, Bell,
 } from 'lucide-react';
 
@@ -104,101 +104,126 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
-// ─── Job-Karte (Heute-Tab) ────────────────────────────────────────────────────
-function JobRow({ job, actionLabel, actionColor, onAction }: {
-  job: Job; actionLabel?: string; actionColor?: string; onAction?: () => void;
-}) {
+// ─── Nächster Schritt je Status ───────────────────────────────────────────────
+const NEXT: Partial<Record<Status, { status: Status; label: string; color: string }>> = {
+  annahme:        { status:'diagnose',       label:'Diagnose starten',      color: '#ca8a04' },
+  diagnose:       { status:'teile_bestellt', label:'Teile bestellen',       color: '#ea580c' },
+  teile_bestellt: { status:'teile_da',       label:'Teile eingetroffen ✓',  color: '#9333ea' },
+  teile_da:       { status:'reparatur',      label:'Reparatur starten',     color: '#dc2626' },
+  reparatur:      { status:'abholbereit',    label:'Fertig — Abholbereit 🎉', color: T.green  },
+  abholbereit:    { status:'abgeholt',       label:'Abgeholt ✓',            color: T.gray   },
+};
+
+const SORT_PRIORITY: Status[] = ['abholbereit','reparatur','teile_da','teile_bestellt','diagnose','annahme','abgeholt'];
+
+// ─── Mechaniker-Karte ─────────────────────────────────────────────────────────
+function MechCard({ job, onNext }: { job: Job; onNext: (s: Status) => void }) {
+  const { color, bg, border, label } = S[job.status];
+  const next = NEXT[job.status];
+  const done = job.status === 'abgeholt';
+
   return (
     <div style={{
-      background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
-      padding: '14px 16px', display:'flex', alignItems:'center', gap:14,
-      boxShadow: T.shadow, borderLeft: `4px solid ${S[job.status].color}`,
+      background: done ? T.grayBg : T.surface,
+      border: `1px solid ${done ? T.border : border}`,
+      borderRadius: 16,
+      overflow: 'hidden',
+      boxShadow: done ? 'none' : T.shadow,
+      opacity: done ? 0.55 : 1,
     }}>
-      {job.uhrzeit && (
-        <div style={{ textAlign:'center', minWidth:44 }}>
-          <div style={{ fontSize:13, fontWeight:800, color: T.amber, lineHeight:1 }}>{job.uhrzeit}</div>
-          <div style={{ fontSize:10, color: T.textSm, marginTop:2 }}>Uhr</div>
+      {/* Farbstreifen oben */}
+      <div style={{ height: 5, backgroundColor: color }} />
+
+      <div style={{ padding: '16px 16px 14px' }}>
+        {/* Priorität-Banner */}
+        {job.priority === 'urgent' && !done && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 14 }}>🔴</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: T.red }}>DRINGEND — sofort bearbeiten</span>
+          </div>
+        )}
+        {job.priority === 'high' && !done && (
+          <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '6px 10px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 14 }}>🟠</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: T.orange }}>Hohe Priorität</span>
+          </div>
+        )}
+
+        {/* Kennzeichen + Status */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontFamily: 'monospace', fontSize: 26, fontWeight: 900, color: T.text, letterSpacing: '0.06em', lineHeight: 1 }}>
+            {job.kennzeichen}
+          </span>
+          <span style={{ backgroundColor: bg, color, border: `1px solid ${border}`, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', marginTop: 4 }}>
+            {label}
+          </span>
+        </div>
+
+        {/* Aufgabe */}
+        <div style={{ fontSize: 15, fontWeight: 600, color: T.text, marginBottom: 4 }}>{job.titel}</div>
+        <div style={{ fontSize: 13, color: T.textSm, marginBottom: job.smsGesendet ? 8 : 0 }}>{job.kunde}</div>
+
+        {job.smsGesendet && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: T.green, fontWeight: 600, marginBottom: 4 }}>
+            <MessageSquare size={11} /> SMS an Kunde gesendet
+          </div>
+        )}
+      </div>
+
+      {/* Action-Button — volle Breite, großes Touch-Target */}
+      {next && !done && (
+        <button
+          onClick={() => onNext(next.status)}
+          style={{
+            width: '100%', minHeight: 60, border: 'none', cursor: 'pointer',
+            backgroundColor: next.color, color: '#fff',
+            fontSize: 16, fontWeight: 800, letterSpacing: '0.01em',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            transition: 'opacity 0.1s',
+          }}
+          onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.88')}
+          onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
+        >
+          {next.label} <ChevronRight size={20} strokeWidth={2.5} />
+        </button>
+      )}
+      {done && (
+        <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: T.textSm, borderTop: `1px solid ${T.border}` }}>
+          ✅ Abgeschlossen
         </div>
       )}
-      <Avatar name={job.kunde} />
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
-          <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:14, color: T.text, letterSpacing:'0.05em' }}>{job.kennzeichen}</span>
-          <Dot priority={job.priority} />
-          {job.priority === 'urgent' && <span style={{ fontSize:10, fontWeight:700, color: T.red }}>DRINGEND</span>}
-        </div>
-        <div style={{ fontSize:13, color: T.textMd, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{job.titel}</div>
-        <div style={{ fontSize:12, color: T.textSm, marginTop:2 }}>{job.kunde}</div>
-      </div>
-      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-        {job.smsGesendet && (
-          <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color: T.green, fontWeight:600 }}>
-            <MessageSquare size={12} /> SMS ✓
-          </span>
-        )}
-        <a href={`tel:${job.telefon}`} className="tel-btn" style={{
-          display:'flex', alignItems:'center', justifyContent:'center',
-          width:40, height:40, borderRadius:10, backgroundColor: T.blueBg,
-          border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none',
-        }}>
-          <Phone size={16} />
-        </a>
-        {actionLabel && onAction && (
-          <button onClick={onAction} style={{
-            display:'flex', alignItems:'center', gap:6, padding:'0 14px', height:40,
-            borderRadius:10, backgroundColor: actionColor ?? T.green,
-            border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer',
-          }}>
-            {actionLabel} <ChevronRight size={13} />
-          </button>
-        )}
-      </div>
     </div>
   );
 }
 
 // ─── Heute-Tab ────────────────────────────────────────────────────────────────
 function HeuteTab({ jobs, onChange }: { jobs: Job[]; onChange: (id:string, s:Status)=>void }) {
-  const fertig  = jobs.filter(j => j.status === 'abholbereit');
-  const arbeit  = jobs.filter(j => ['diagnose','teile_bestellt','teile_da','reparatur'].includes(j.status));
-  const neu     = jobs.filter(j => j.status === 'annahme');
+  const priorityWeight = (p: Priority) => p === 'urgent' ? 0 : p === 'high' ? 1 : 2;
 
-  function Section({ title, subtitle, color, icon: Icon, items, nextStatus, btnLabel, btnColor }:{
-    title:string; subtitle:string; color:string; icon:React.ElementType;
-    items:Job[]; nextStatus?:Status; btnLabel?:string; btnColor?:string;
-  }) {
-    return (
-      <div>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-          <div style={{ width:36, height:36, borderRadius:10, backgroundColor:`${color}18`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Icon size={18} color={color} />
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:14, fontWeight:700, color: T.text }}>{title}</div>
-            <div style={{ fontSize:12, color: T.textSm }}>{subtitle}</div>
-          </div>
-          <div style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:20, backgroundColor:`${color}15`, color }}>{items.length} Aufträge</div>
-        </div>
-        {items.length === 0
-          ? <div style={{ padding:'20px', textAlign:'center', color: T.textSm, fontSize:13, border:`1px dashed ${T.border}`, borderRadius:12, backgroundColor: T.grayBg }}>Keine Einträge</div>
-          : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {items.map(j => (
-                <JobRow key={j.id} job={j}
-                  actionLabel={btnLabel} actionColor={btnColor}
-                  onAction={nextStatus ? () => onChange(j.id, nextStatus) : undefined}
-                />
-              ))}
-            </div>
-        }
-      </div>
-    );
-  }
+  const sorted = [...jobs].sort((a, b) => {
+    const si = SORT_PRIORITY.indexOf(a.status) - SORT_PRIORITY.indexOf(b.status);
+    if (si !== 0) return si;
+    return priorityWeight(a.priority) - priorityWeight(b.priority);
+  });
+
+  const open   = sorted.filter(j => j.status !== 'abgeholt');
+  const closed = sorted.filter(j => j.status === 'abgeholt');
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
-      <Section title="Abholbereit" subtitle="Kunden wurden per SMS benachrichtigt" color={T.green} icon={CheckCircle2} items={fertig} nextStatus="abgeholt" btnLabel="Abgeholt" btnColor={T.green} />
-      <Section title="In der Werkstatt" subtitle="Aktuell in Bearbeitung" color={T.orange} icon={Wrench} items={arbeit} />
-      <Section title="Heute Annahme" subtitle="Kommen noch rein" color={T.blue} icon={Car} items={neu} nextStatus="diagnose" btnLabel="Diagnose" btnColor={T.blue} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {open.map(j => (
+        <MechCard key={j.id} job={j} onNext={(s) => onChange(j.id, s)} />
+      ))}
+      {closed.length > 0 && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.textSm, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '8px 0 10px', textAlign: 'center' }}>
+            Heute abgeholt ({closed.length})
+          </div>
+          {closed.map(j => (
+            <MechCard key={j.id} job={j} onNext={(s) => onChange(j.id, s)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
