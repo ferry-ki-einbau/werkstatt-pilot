@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 
 const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login })));
 const Register = lazy(() => import('@/pages/Register').then((m) => ({ default: m.Register })));
+const DemoDashboard = lazy(() => import('@/pages/DemoDashboard').then((m) => ({ default: m.DemoDashboard })));
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Customers = lazy(() => import('@/pages/Customers').then((m) => ({ default: m.Customers })));
 const Vehicles = lazy(() => import('@/pages/Vehicles').then((m) => ({ default: m.Vehicles })));
@@ -91,6 +92,9 @@ export function AppRoutes() {
           <Route path="/fahrzeuge" element={<Vehicles />} />
           <Route path="/einstellungen" element={<Settings />} />
         </Route>
+
+        {/* Demo — no auth needed */}
+        <Route path="/demo" element={<DemoDashboard />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
