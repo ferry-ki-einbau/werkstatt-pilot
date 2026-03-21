@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  DndContext, DragOverlay, PointerSensor, TouchSensor,
-  useSensor, useSensors, useDroppable, useDraggable,
-  type DragStartEvent, type DragEndEvent,
-} from '@dnd-kit/core';
-import {
   Wrench, Phone, CheckCircle2, Clock, CalendarDays, List,
-  ChevronRight, GripVertical, Plus, Car,
+  ChevronRight, ChevronDown, Plus, Car,
   MessageSquare, ArrowRight, X, Bell,
 } from 'lucide-react';
 
@@ -208,103 +203,96 @@ function HeuteTab({ jobs, onChange }: { jobs: Job[]; onChange: (id:string, s:Sta
   );
 }
 
-// ─── Kanban-Tab ───────────────────────────────────────────────────────────────
-function KanbanCard({ job, onClick }: { job:Job; onClick:()=>void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: job.id });
-  return (
-    <div
-      ref={setNodeRef}
-      onClick={onClick}
-      style={{
-        transform: transform ? `translate(${transform.x}px,${transform.y}px)` : undefined,
-        opacity: isDragging ? 0.25 : 1,
-        background: T.surface,
-        border: `1px solid ${T.border}`,
-        borderRadius: 10,
-        padding: '10px 12px',
-        cursor: 'pointer',
-        boxShadow: T.shadow,
-        userSelect: 'none',
-      }}
-    >
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
-        <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:12, color: T.text, letterSpacing:'0.05em' }}>{job.kennzeichen}</span>
-        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-          <Dot priority={job.priority} />
-          <div {...attributes} {...listeners} style={{ color: T.textSm, cursor:'grab', lineHeight:0 }}>
-            <GripVertical size={13} />
-          </div>
-        </div>
-      </div>
-      <div style={{ fontSize:12, color: T.textMd, lineHeight:1.4, marginBottom:8 }}>{job.titel}</div>
-      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-        <Avatar name={job.kunde} />
-        <span style={{ fontSize:11, color: T.textSm }}>{job.kunde.split(' ')[0]}</span>
-      </div>
-    </div>
-  );
-}
-
-function KanbanCol({ status, jobs, onJobClick }: { status:Status; jobs:Job[]; onJobClick:(j:Job)=>void }) {
-  const { label, color, bg, border } = S[status];
-  const { setNodeRef, isOver } = useDroppable({ id: status });
-  return (
-    <div style={{ width:190, flexShrink:0, display:'flex', flexDirection:'column', gap:8 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 4px', marginBottom:4 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-          <span style={{ width:8, height:8, borderRadius:'50%', backgroundColor: color, display:'inline-block' }} />
-          <span style={{ fontSize:12, fontWeight:700, color: T.text }}>{label}</span>
-        </div>
-        <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:12, backgroundColor: bg, color, border:`1px solid ${border}` }}>{jobs.length}</span>
-      </div>
-      <div ref={setNodeRef} style={{
-        display:'flex', flexDirection:'column', gap:7,
-        minHeight:160, borderRadius:12, padding:8,
-        backgroundColor: isOver ? bg : T.grayBg,
-        border: `1.5px dashed ${isOver ? color : T.border}`,
-        transition:'all 0.15s',
-      }}>
-        {jobs.map(j => <KanbanCard key={j.id} job={j} onClick={() => onJobClick(j)} />)}
-      </div>
-    </div>
-  );
-}
-
-function KanbanTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Status)=>void }) {
-  const [active, setActive]   = useState<Job|null>(null);
+// ─── Aufträge-Tab (Listenansicht, kein horizontaler Scroll) ──────────────────
+function AuftraegeTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Status)=>void }) {
   const [selected, setSelected] = useState<Job|null>(null);
-  const sensors = useSensors(
-    useSensor(PointerSensor,{ activationConstraint:{ distance:8 } }),
-    useSensor(TouchSensor,  { activationConstraint:{ delay:200, tolerance:8 } })
-  );
+  const [collapsed, setCollapsed] = useState<Record<Status,boolean>>({} as Record<Status,boolean>);
+
+  const toggle = (s: Status) => setCollapsed(p => ({ ...p, [s]: !p[s] }));
+
+  const activeStatuses = ORDER.filter(s => jobs.some(j => j.status === s));
+
   return (
     <>
-      <div style={{ overflowX:'auto', margin:'0 -16px', padding:'0 16px 16px' }}>
-        <DndContext sensors={sensors}
-          onDragStart={(e:DragStartEvent) => setActive(jobs.find(j=>j.id===e.active.id)??null)}
-          onDragEnd={(e:DragEndEvent)   => { setActive(null); const ns=ORDER.find(s=>s===e.over?.id); if(ns) onChange(e.active.id as string,ns); }}
-        >
-          <div style={{ display:'flex', gap:12, minWidth:'max-content' }}>
-            {ORDER.map(s => <KanbanCol key={s} status={s} jobs={jobs.filter(j=>j.status===s)} onJobClick={setSelected} />)}
-          </div>
-          <DragOverlay>
-            {active && (
-              <div style={{ background:T.surface, border:`2px solid ${T.amber}`, borderRadius:10, padding:'10px 12px', width:190, boxShadow:T.shadowMd, transform:'rotate(2deg)' }}>
-                <div style={{ fontFamily:'monospace', fontWeight:800, fontSize:12, color:T.text }}>{active.kennzeichen}</div>
-                <div style={{ fontSize:12, color:T.textMd, marginTop:4 }}>{active.titel}</div>
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {activeStatuses.map(s => {
+          const group = jobs.filter(j => j.status === s);
+          const { label, color, bg, border } = S[s];
+          const isOpen = !collapsed[s];
+          return (
+            <div key={s} style={{ background: T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', boxShadow: T.shadow }}>
+              {/* Group header */}
+              <button
+                onClick={() => toggle(s)}
+                style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'13px 16px', background:'none', border:'none', cursor:'pointer', textAlign:'left' }}
+              >
+                <span style={{ width:10, height:10, borderRadius:'50%', backgroundColor: color, display:'inline-block', flexShrink:0 }} />
+                <span style={{ fontSize:14, fontWeight:700, color: T.text, flex:1 }}>{label}</span>
+                <span style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:20, backgroundColor: bg, color, border:`1px solid ${border}` }}>
+                  {group.length}
+                </span>
+                {isOpen ? <ChevronDown size={15} color={T.textSm}/> : <ChevronRight size={15} color={T.textSm}/>}
+              </button>
+
+              {/* Job rows */}
+              {isOpen && group.length > 0 && (
+                <div style={{ borderTop:`1px solid ${T.border}` }}>
+                  {group.map((job, idx) => (
+                    <div
+                      key={job.id}
+                      onClick={() => setSelected(job)}
+                      style={{
+                        display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
+                        borderTop: idx > 0 ? `1px solid ${T.border}` : undefined,
+                        cursor:'pointer', transition:'background 0.1s',
+                        borderLeft:`4px solid ${color}`,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = T.bg)}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Avatar name={job.kunde} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+                          <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:13, color: T.text, letterSpacing:'0.05em' }}>{job.kennzeichen}</span>
+                          <Dot priority={job.priority} />
+                          {job.priority === 'urgent' && <span style={{ fontSize:10, fontWeight:700, color: T.red }}>DRINGEND</span>}
+                        </div>
+                        <div style={{ fontSize:12, color: T.textMd, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{job.titel}</div>
+                        <div style={{ fontSize:11, color: T.textSm, marginTop:1 }}>{job.kunde}</div>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                        {job.smsGesendet && (
+                          <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color: T.green, fontWeight:600 }}>
+                            <MessageSquare size={11}/> SMS ✓
+                          </span>
+                        )}
+                        <a
+                          href={`tel:${job.telefon}`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:9, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none', flexShrink:0 }}
+                        >
+                          <Phone size={15}/>
+                        </a>
+                        <ChevronRight size={14} color={T.textSm}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isOpen && group.length === 0 && (
+                <div style={{ padding:'16px', textAlign:'center', fontSize:12, color: T.textSm, borderTop:`1px solid ${T.border}` }}>Keine Aufträge</div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Detail Modal */}
       {selected && (
         <div style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:16, backgroundColor:'rgba(0,0,0,0.4)', backdropFilter:'blur(4px)' }} onClick={() => setSelected(null)}>
-          <div style={{ background:T.surface, borderRadius:20, width:'100%', maxWidth:400, overflow:'hidden', boxShadow:T.shadowMd }} onClick={e => e.stopPropagation()}>
+          <div style={{ background:T.surface, borderRadius:20, width:'100%', maxWidth:440, overflow:'hidden', boxShadow:T.shadowMd }} onClick={e => e.stopPropagation()}>
             <div style={{ height:4, backgroundColor: S[selected.status].color }} />
             <div style={{ padding:20 }}>
-              {/* Header */}
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
                 <div>
                   <div style={{ fontFamily:'monospace', fontSize:22, fontWeight:900, color:T.text, letterSpacing:'0.05em' }}>{selected.kennzeichen}</div>
@@ -312,7 +300,6 @@ function KanbanTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Statu
                 </div>
                 <button onClick={() => setSelected(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.textSm, padding:4 }}><X size={18}/></button>
               </div>
-              {/* Info Grid */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
                 {[
                   { label:'Kunde',     value:selected.kunde },
@@ -326,9 +313,8 @@ function KanbanTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Statu
                   </div>
                 ))}
               </div>
-              {/* Status ändern */}
               <div style={{ marginBottom:14 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:T.textSm, marginBottom:8 }}>STATUS ÄNDERN</div>
+                <div style={{ fontSize:11, fontWeight:700, color:T.textSm, marginBottom:8, letterSpacing:'0.08em' }}>STATUS ÄNDERN</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
                   {ORDER.filter(s => s!==selected.status).map(s => (
                     <button key={s} onClick={() => { onChange(selected.id,s); setSelected(null); }} style={{
@@ -340,12 +326,10 @@ function KanbanTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Statu
                   ))}
                 </div>
               </div>
-              {/* Anrufen */}
               <a href={`tel:${selected.telefon}`} style={{
-                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                padding:'14px', borderRadius:12, backgroundColor: T.blueBg,
-                border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none',
-                fontWeight:700, fontSize:14,
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'14px',
+                borderRadius:12, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`,
+                color: T.blue, textDecoration:'none', fontWeight:700, fontSize:14,
               }}>
                 <Phone size={16}/> {selected.kunde} anrufen
               </a>
@@ -535,8 +519,8 @@ export function DemoDashboard() {
 
         {/* ── Content ── */}
         <div style={{ paddingBottom:40 }}>
-          {tab === 'heute'     && <HeuteTab  jobs={jobs} onChange={onChange} />}
-          {tab === 'auftraege' && <KanbanTab jobs={jobs} onChange={onChange} />}
+          {tab === 'heute'     && <HeuteTab     jobs={jobs} onChange={onChange} />}
+          {tab === 'auftraege' && <AuftraegeTab jobs={jobs} onChange={onChange} />}
           {tab === 'termine'   && <TermineTab onTerminToJob={() => { setTab('heute'); setToast('✅ Auftrag aus Termin erstellt!'); setTimeout(()=>setToast(null),3000); }} />}
         </div>
       </div>
