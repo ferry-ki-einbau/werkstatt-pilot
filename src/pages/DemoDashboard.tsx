@@ -6,321 +6,348 @@ import {
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  Wrench, LogIn, Phone, CheckCircle2, Clock, CalendarDays,
-  List, ChevronRight, GripVertical, Plus, Car,
-  AlertTriangle, MessageSquare, Star,
+  Wrench, Phone, CheckCircle2, Clock, CalendarDays, List,
+  ChevronRight, GripVertical, Plus, Car,
+  MessageSquare, ArrowRight, X, Bell,
 } from 'lucide-react';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type Status = 'annahme' | 'diagnose' | 'teile_bestellt' | 'teile_da' | 'reparatur' | 'abholbereit' | 'abgeholt';
-
-interface Job {
-  id: string;
-  kennzeichen: string;
-  kunde: string;
-  telefon: string;
-  titel: string;
-  status: Status;
-  priority: 'normal' | 'high' | 'urgent';
-  uhrzeit?: string;
-  smsGesendet?: boolean;
-}
-
-// ─── Config ──────────────────────────────────────────────────────────────────
-
-const STATUS: Record<Status, { label: string; color: string; short: string }> = {
-  annahme:        { label: 'Annahme',        color: '#3b82f6', short: 'NEU'   },
-  diagnose:       { label: 'Diagnose',       color: '#eab308', short: 'DIAG'  },
-  teile_bestellt: { label: 'Teile bestellt', color: '#f97316', short: 'BEST'  },
-  teile_da:       { label: 'Teile da',       color: '#a855f7', short: 'BEREIT'},
-  reparatur:      { label: 'In Reparatur',   color: '#ef4444', short: 'REP'   },
-  abholbereit:    { label: 'Abholbereit',    color: '#22c55e', short: 'FERTIG'},
-  abgeholt:       { label: 'Abgeholt',       color: '#6b7280', short: 'WEG'   },
+// ─── CSS-in-JS light theme ────────────────────────────────────────────────────
+const T = {
+  bg:        '#f8fafc',
+  surface:   '#ffffff',
+  border:    '#e2e8f0',
+  borderMd:  '#cbd5e1',
+  text:      '#0f172a',
+  textMd:    '#475569',
+  textSm:    '#94a3b8',
+  amber:     '#f59e0b',
+  amberBg:   '#fffbeb',
+  amberBd:   '#fde68a',
+  green:     '#16a34a',
+  greenBg:   '#f0fdf4',
+  greenBd:   '#bbf7d0',
+  blue:      '#2563eb',
+  blueBg:    '#eff6ff',
+  blueBd:    '#bfdbfe',
+  red:       '#dc2626',
+  redBg:     '#fef2f2',
+  orange:    '#ea580c',
+  purple:    '#9333ea',
+  yellow:    '#ca8a04',
+  gray:      '#64748b',
+  grayBg:    '#f1f5f9',
+  shadow:    '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)',
+  shadowMd:  '0 4px 12px rgba(0,0,0,0.1)',
 };
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Status = 'annahme'|'diagnose'|'teile_bestellt'|'teile_da'|'reparatur'|'abholbereit'|'abgeholt';
+type Priority = 'normal'|'high'|'urgent';
+
+interface Job {
+  id: string; kennzeichen: string; kunde: string; telefon: string;
+  titel: string; status: Status; priority: Priority; uhrzeit?: string; smsGesendet?: boolean;
+}
+
+// ─── Status-Konfiguration ─────────────────────────────────────────────────────
+const S: Record<Status, { label: string; color: string; bg: string; border: string }> = {
+  annahme:        { label:'Annahme',        color: T.blue,   bg: T.blueBg,  border: T.blueBd  },
+  diagnose:       { label:'Diagnose',       color: T.yellow, bg:'#fefce8',  border:'#fef08a'  },
+  teile_bestellt: { label:'Teile bestellt', color: T.orange, bg:'#fff7ed',  border:'#fed7aa'  },
+  teile_da:       { label:'Teile da',       color: T.purple, bg:'#faf5ff',  border:'#e9d5ff'  },
+  reparatur:      { label:'In Reparatur',   color: T.red,    bg: T.redBg,   border:'#fecaca'  },
+  abholbereit:    { label:'Abholbereit',    color: T.green,  bg: T.greenBg, border: T.greenBd },
+  abgeholt:       { label:'Abgeholt',       color: T.gray,   bg: T.grayBg,  border: T.border  },
+};
 const ORDER: Status[] = ['annahme','diagnose','teile_bestellt','teile_da','reparatur','abholbereit','abgeholt'];
 
-// ─── Demo data ────────────────────────────────────────────────────────────────
-
+// ─── Demo-Daten ───────────────────────────────────────────────────────────────
 const INIT: Job[] = [
-  { id:'1', kennzeichen:'S-KR 4421',  kunde:'Thomas Krause',    telefon:'+49 711 123456',  titel:'Ölwechsel + Inspektion',      status:'annahme',        priority:'normal', uhrzeit:'08:00' },
-  { id:'2', kennzeichen:'WN-BM 882',  kunde:'Sabine Müller',    telefon:'+49 7151 98765',  titel:'Bremsen vorne erneuern',      status:'diagnose',       priority:'high',   uhrzeit:'09:30' },
-  { id:'3', kennzeichen:'S-AX 1199',  kunde:'Klaus Hofmann',    telefon:'+49 711 556677',  titel:'Klimaanlage befüllen',        status:'teile_bestellt', priority:'normal', uhrzeit:'10:00' },
-  { id:'4', kennzeichen:'ES-TF 330',  kunde:'Maria Weber',      telefon:'+49 711 778899',  titel:'Stoßdämpfer tauschen',        status:'teile_da',       priority:'urgent', uhrzeit:'11:00' },
-  { id:'5', kennzeichen:'WN-GO 77',   kunde:'Peter Schmidt',    telefon:'+49 7151 334455', titel:'Motor läuft unrund',          status:'reparatur',      priority:'high',   uhrzeit:'13:00' },
-  { id:'6', kennzeichen:'S-LK 2233',  kunde:'Anna Becker',      telefon:'+49 711 990011',  titel:'TÜV-Vorbereitung + HU',      status:'abholbereit',    priority:'normal', uhrzeit:'14:00', smsGesendet:true },
-  { id:'7', kennzeichen:'WN-RT 991',  kunde:'Hans Zimmermann',  telefon:'+49 7151 223344', titel:'Reifenwechsel Sommer',        status:'abgeholt',       priority:'normal', uhrzeit:'15:30', smsGesendet:true },
-  { id:'8', kennzeichen:'S-MB 5511',  kunde:'Julia Fischer',    telefon:'+49 711 667788',  titel:'Zahnriemen wechseln',         status:'reparatur',      priority:'urgent', uhrzeit:'09:00' },
-  { id:'9', kennzeichen:'ES-WK 448',  kunde:'Michael Braun',    telefon:'+49 711 445566',  titel:'Auspuffanlage erneuern',      status:'annahme',        priority:'normal', uhrzeit:'16:00' },
+  { id:'1', kennzeichen:'S-KR 4421',  kunde:'Thomas Krause',   telefon:'+49 711 123456',  titel:'Ölwechsel + Inspektion',   status:'annahme',        priority:'normal', uhrzeit:'08:00' },
+  { id:'2', kennzeichen:'WN-BM 882',  kunde:'Sabine Müller',   telefon:'+49 7151 98765',  titel:'Bremsen vorne erneuern',   status:'diagnose',       priority:'high',   uhrzeit:'09:30' },
+  { id:'3', kennzeichen:'S-AX 1199',  kunde:'Klaus Hofmann',   telefon:'+49 711 556677',  titel:'Klimaanlage befüllen',     status:'teile_bestellt', priority:'normal', uhrzeit:'10:00' },
+  { id:'4', kennzeichen:'ES-TF 330',  kunde:'Maria Weber',     telefon:'+49 711 778899',  titel:'Stoßdämpfer tauschen',     status:'teile_da',       priority:'urgent', uhrzeit:'11:00' },
+  { id:'5', kennzeichen:'WN-GO 77',   kunde:'Peter Schmidt',   telefon:'+49 7151 334455', titel:'Motor läuft unrund',       status:'reparatur',      priority:'high',   uhrzeit:'13:00' },
+  { id:'6', kennzeichen:'S-LK 2233',  kunde:'Anna Becker',     telefon:'+49 711 990011',  titel:'TÜV-Vorbereitung + HU',   status:'abholbereit',    priority:'normal', uhrzeit:'14:00', smsGesendet:true },
+  { id:'7', kennzeichen:'WN-RT 991',  kunde:'Hans Zimmermann', telefon:'+49 7151 223344', titel:'Reifenwechsel Sommer',     status:'abgeholt',       priority:'normal', uhrzeit:'15:30', smsGesendet:true },
+  { id:'8', kennzeichen:'S-MB 5511',  kunde:'Julia Fischer',   telefon:'+49 711 667788',  titel:'Zahnriemen wechseln',      status:'reparatur',      priority:'urgent', uhrzeit:'09:00' },
+  { id:'9', kennzeichen:'ES-WK 448',  kunde:'Michael Braun',   telefon:'+49 711 445566',  titel:'Auspuffanlage erneuern',   status:'annahme',        priority:'normal', uhrzeit:'16:00' },
 ];
 
 const TERMINE = [
-  { id:'t1', tag:'Montag',     datum:'24.03.',  uhrzeit:'08:00', kunde:'Frank Bauer',      kennzeichen:'S-FB 110',  grund:'Inspektion + TÜV' },
-  { id:'t2', tag:'Montag',     datum:'24.03.',  uhrzeit:'10:30', kunde:'Erika Vogel',      kennzeichen:'WN-EV 44',  grund:'Bremsen hinten' },
-  { id:'t3', tag:'Dienstag',   datum:'25.03.',  uhrzeit:'08:00', kunde:'Stefan Lenz',      kennzeichen:'S-SL 778',  grund:'Ölwechsel' },
-  { id:'t4', tag:'Dienstag',   datum:'25.03.',  uhrzeit:'11:00', kunde:'Monika Klein',     kennzeichen:'ES-MK 99',  grund:'Klimaanlage' },
-  { id:'t5', tag:'Mittwoch',   datum:'26.03.',  uhrzeit:'09:00', kunde:'Rainer Schulz',    kennzeichen:'WN-RS 555', grund:'Zahnriemen' },
-  { id:'t6', tag:'Donnerstag', datum:'27.03.',  uhrzeit:'08:30', kunde:'Carla Müller',     kennzeichen:'S-CM 321',  grund:'Fehlerdiagnose' },
-  { id:'t7', tag:'Freitag',    datum:'28.03.',  uhrzeit:'10:00', kunde:'Ahmed Hassan',     kennzeichen:'S-AH 77',   grund:'Reifenwechsel' },
+  { id:'t1', tag:'Montag',    datum:'24.03.', uhrzeit:'08:00', kunde:'Frank Bauer',    kennzeichen:'S-FB 110',  grund:'Inspektion + TÜV',  heute:true },
+  { id:'t2', tag:'Montag',    datum:'24.03.', uhrzeit:'10:30', kunde:'Erika Vogel',    kennzeichen:'WN-EV 44',  grund:'Bremsen hinten',    heute:true },
+  { id:'t3', tag:'Montag',    datum:'24.03.', uhrzeit:'14:00', kunde:'Stefan Lenz',    kennzeichen:'S-SL 778',  grund:'Ölwechsel',         heute:true },
+  { id:'t4', tag:'Dienstag',  datum:'25.03.', uhrzeit:'08:00', kunde:'Monika Klein',   kennzeichen:'ES-MK 99',  grund:'Klimaanlage',       heute:false },
+  { id:'t5', tag:'Dienstag',  datum:'25.03.', uhrzeit:'11:00', kunde:'Rainer Schulz',  kennzeichen:'WN-RS 555', grund:'Zahnriemen',        heute:false },
+  { id:'t6', tag:'Mittwoch',  datum:'26.03.', uhrzeit:'09:00', kunde:'Carla Müller',   kennzeichen:'S-CM 321',  grund:'Fehlerdiagnose',    heute:false },
+  { id:'t7', tag:'Donnerstag',datum:'27.03.', uhrzeit:'08:30', kunde:'Ahmed Hassan',   kennzeichen:'S-AH 77',   grund:'Reifenwechsel',     heute:false },
+  { id:'t8', tag:'Freitag',   datum:'28.03.', uhrzeit:'10:00', kunde:'Lisa Neumann',   kennzeichen:'ES-LN 12',  grund:'Inspektion',        heute:false },
 ];
 
-// ─── Kleine Helfer-Komponenten ────────────────────────────────────────────────
-
-function StatusPill({ status }: { status: Status }) {
-  const { label, color } = STATUS[status];
+// ─── Helper ───────────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: Status }) {
+  const { label, color, bg, border } = S[status];
   return (
-    <span
-      className="text-xs font-bold px-2 py-0.5 rounded-full"
-      style={{ backgroundColor: color + '22', color }}
-    >
+    <span style={{ backgroundColor: bg, color, border: `1px solid ${border}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
       {label}
     </span>
   );
 }
 
-function PriorityBadge({ priority }: { priority: Job['priority'] }) {
+function Dot({ priority }: { priority: Priority }) {
   if (priority === 'normal') return null;
-  const color = priority === 'urgent' ? '#ef4444' : '#f97316';
-  const label = priority === 'urgent' ? '🔴 Dringend' : '🟠 Hoch';
+  return <span style={{ display:'inline-block', width:7, height:7, borderRadius:'50%', backgroundColor: priority==='urgent'?T.red:T.orange, flexShrink:0 }} />;
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
   return (
-    <span className="text-xs font-semibold" style={{ color }}>{label}</span>
+    <div style={{ width:32, height:32, borderRadius:'50%', backgroundColor: T.amberBg, border:`2px solid ${T.amberBd}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:T.amber, flexShrink:0 }}>
+      {initials}
+    </div>
+  );
+}
+
+// ─── Job-Karte (Heute-Tab) ────────────────────────────────────────────────────
+function JobRow({ job, actionLabel, actionColor, onAction }: {
+  job: Job; actionLabel?: string; actionColor?: string; onAction?: () => void;
+}) {
+  return (
+    <div style={{
+      background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
+      padding: '14px 16px', display:'flex', alignItems:'center', gap:14,
+      boxShadow: T.shadow, borderLeft: `4px solid ${S[job.status].color}`,
+    }}>
+      {job.uhrzeit && (
+        <div style={{ textAlign:'center', minWidth:44 }}>
+          <div style={{ fontSize:13, fontWeight:800, color: T.amber, lineHeight:1 }}>{job.uhrzeit}</div>
+          <div style={{ fontSize:10, color: T.textSm, marginTop:2 }}>Uhr</div>
+        </div>
+      )}
+      <Avatar name={job.kunde} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+          <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:14, color: T.text, letterSpacing:'0.05em' }}>{job.kennzeichen}</span>
+          <Dot priority={job.priority} />
+          {job.priority === 'urgent' && <span style={{ fontSize:10, fontWeight:700, color: T.red }}>DRINGEND</span>}
+        </div>
+        <div style={{ fontSize:13, color: T.textMd, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{job.titel}</div>
+        <div style={{ fontSize:12, color: T.textSm, marginTop:2 }}>{job.kunde}</div>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+        {job.smsGesendet && (
+          <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color: T.green, fontWeight:600 }}>
+            <MessageSquare size={12} /> SMS ✓
+          </span>
+        )}
+        <a href={`tel:${job.telefon}`} style={{
+          display:'flex', alignItems:'center', justifyContent:'center',
+          width:40, height:40, borderRadius:10, backgroundColor: T.blueBg,
+          border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none',
+        }}>
+          <Phone size={16} />
+        </a>
+        {actionLabel && onAction && (
+          <button onClick={onAction} style={{
+            display:'flex', alignItems:'center', gap:6, padding:'0 14px', height:40,
+            borderRadius:10, backgroundColor: actionColor ?? T.green,
+            border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer',
+          }}>
+            {actionLabel} <ChevronRight size={13} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
 // ─── Heute-Tab ────────────────────────────────────────────────────────────────
+function HeuteTab({ jobs, onChange }: { jobs: Job[]; onChange: (id:string, s:Status)=>void }) {
+  const fertig  = jobs.filter(j => j.status === 'abholbereit');
+  const arbeit  = jobs.filter(j => ['diagnose','teile_bestellt','teile_da','reparatur'].includes(j.status));
+  const neu     = jobs.filter(j => j.status === 'annahme');
 
-function HeuteTab({ jobs, onStatusChange }: { jobs: Job[]; onStatusChange: (id: string, s: Status) => void }) {
-  const abholbereit = jobs.filter(j => j.status === 'abholbereit');
-  const inArbeit    = jobs.filter(j => ['diagnose','teile_bestellt','teile_da','reparatur'].includes(j.status));
-  const neu         = jobs.filter(j => j.status === 'annahme');
-
-  function Section({ title, color, icon: Icon, items, nextStatus, actionLabel }:{
-    title: string; color: string; icon: React.ElementType;
-    items: Job[]; nextStatus?: Status; actionLabel?: string;
+  function Section({ title, subtitle, color, icon: Icon, items, nextStatus, btnLabel, btnColor }:{
+    title:string; subtitle:string; color:string; icon:React.ElementType;
+    items:Job[]; nextStatus?:Status; btnLabel?:string; btnColor?:string;
   }) {
     return (
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + '20' }}>
-            <Icon className="w-4 h-4" style={{ color }} />
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, backgroundColor:`${color}18`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Icon size={18} color={color} />
           </div>
-          <h3 className="font-bold text-sm" style={{ color: 'var(--foreground)' }}>{title}</h3>
-          <span className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-auto" style={{ backgroundColor: color + '20', color }}>{items.length}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:700, color: T.text }}>{title}</div>
+            <div style={{ fontSize:12, color: T.textSm }}>{subtitle}</div>
+          </div>
+          <div style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:20, backgroundColor:`${color}15`, color }}>{items.length} Aufträge</div>
         </div>
-        {items.length === 0 ? (
-          <p className="text-xs px-4 py-6 text-center rounded-xl" style={{ color:'#6b6b78', border:'1px dashed var(--border)' }}>Keine Einträge</p>
-        ) : (
-          <div className="space-y-2">
-            {items.map(job => (
-              <div
-                key={job.id}
-                className="rounded-xl p-4 flex items-center gap-4"
-                style={{ backgroundColor:'var(--card)', border:'1px solid var(--border)' }}
-              >
-                {/* Time */}
-                {job.uhrzeit && (
-                  <div className="shrink-0 text-center w-12">
-                    <p className="text-xs font-bold" style={{ color:'var(--primary)' }}>{job.uhrzeit}</p>
-                    <p className="text-xs" style={{ color:'#6b6b78' }}>Uhr</p>
-                  </div>
-                )}
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-bold text-sm" style={{ color:'var(--foreground)', fontFamily:'monospace' }}>{job.kennzeichen}</span>
-                    <PriorityBadge priority={job.priority} />
-                  </div>
-                  <p className="text-xs truncate" style={{ color:'#9ca3af' }}>{job.titel}</p>
-                  <p className="text-xs mt-0.5" style={{ color:'#6b6b78' }}>{job.kunde}</p>
-                </div>
-                {/* Actions */}
-                <div className="shrink-0 flex items-center gap-2">
-                  {job.smsGesendet && (
-                    <span className="text-xs flex items-center gap-1" style={{ color:'#22c55e' }}>
-                      <MessageSquare className="w-3 h-3" /> SMS ✓
-                    </span>
-                  )}
-                  <a
-                    href={`tel:${job.telefon}`}
-                    className="flex items-center justify-center w-10 h-10 rounded-xl transition-colors"
-                    style={{ backgroundColor:'rgba(59,130,246,0.12)', color:'#3b82f6' }}
-                  >
-                    <Phone className="w-4 h-4" />
-                  </a>
-                  {nextStatus && actionLabel && (
-                    <button
-                      onClick={() => onStatusChange(job.id, nextStatus)}
-                      className="flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-bold transition-colors"
-                      style={{ backgroundColor: color + '20', color }}
-                    >
-                      {actionLabel} <ChevronRight className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {items.length === 0
+          ? <div style={{ padding:'20px', textAlign:'center', color: T.textSm, fontSize:13, border:`1px dashed ${T.border}`, borderRadius:12, backgroundColor: T.grayBg }}>Keine Einträge</div>
+          : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {items.map(j => (
+                <JobRow key={j.id} job={j}
+                  actionLabel={btnLabel} actionColor={btnColor}
+                  onAction={nextStatus ? () => onChange(j.id, nextStatus) : undefined}
+                />
+              ))}
+            </div>
+        }
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <Section title="Abholbereit — Kunden benachrichtigt" color="#22c55e" icon={CheckCircle2} items={abholbereit} nextStatus="abgeholt" actionLabel="Abgeholt" />
-      <Section title="Heute in der Werkstatt" color="#ef4444" icon={Wrench} items={inArbeit} />
-      <Section title="Heute Annahme" color="#3b82f6" icon={Car} items={neu} nextStatus="diagnose" actionLabel="Diagnose starten" />
+    <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+      <Section title="Abholbereit" subtitle="Kunden wurden per SMS benachrichtigt" color={T.green} icon={CheckCircle2} items={fertig} nextStatus="abgeholt" btnLabel="Abgeholt" btnColor={T.green} />
+      <Section title="In der Werkstatt" subtitle="Aktuell in Bearbeitung" color={T.orange} icon={Wrench} items={arbeit} />
+      <Section title="Heute Annahme" subtitle="Kommen noch rein" color={T.blue} icon={Car} items={neu} nextStatus="diagnose" btnLabel="Diagnose" btnColor={T.blue} />
     </div>
   );
 }
 
 // ─── Kanban-Tab ───────────────────────────────────────────────────────────────
-
-function KanbanCard({ job, onJobClick }: { job: Job; onJobClick: () => void }) {
+function KanbanCard({ job, onClick }: { job:Job; onClick:()=>void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: job.id });
   return (
     <div
       ref={setNodeRef}
-      onClick={onJobClick}
+      onClick={onClick}
       style={{
         transform: transform ? `translate(${transform.x}px,${transform.y}px)` : undefined,
-        opacity: isDragging ? 0.3 : 1,
-        backgroundColor: 'var(--background)',
-        border: '1px solid var(--border)',
+        opacity: isDragging ? 0.25 : 1,
+        background: T.surface,
+        border: `1px solid ${T.border}`,
         borderRadius: 10,
         padding: '10px 12px',
-        cursor: 'grab',
+        cursor: 'pointer',
+        boxShadow: T.shadow,
         userSelect: 'none',
       }}
     >
-      <div className="flex items-start justify-between gap-1 mb-1">
-        <span className="font-bold text-xs tracking-wider" style={{ color:'var(--foreground)', fontFamily:'monospace' }}>{job.kennzeichen}</span>
-        <div {...attributes} {...listeners} className="shrink-0 mt-0.5" style={{ color:'#4b4b55', cursor:'grab' }}>
-          <GripVertical className="w-3.5 h-3.5" />
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+        <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:12, color: T.text, letterSpacing:'0.05em' }}>{job.kennzeichen}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <Dot priority={job.priority} />
+          <div {...attributes} {...listeners} style={{ color: T.textSm, cursor:'grab', lineHeight:0 }}>
+            <GripVertical size={13} />
+          </div>
         </div>
       </div>
-      <p className="text-xs leading-snug mb-2" style={{ color:'#9ca3af' }}>{job.titel}</p>
-      <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color:'#6b6b78' }}>{job.kunde.split(' ')[0]}</span>
-        {job.priority !== 'normal' && (
-          <span className="text-xs" style={{ color: job.priority === 'urgent' ? '#ef4444' : '#f97316' }}>
-            {job.priority === 'urgent' ? '●' : '●'}
-          </span>
-        )}
+      <div style={{ fontSize:12, color: T.textMd, lineHeight:1.4, marginBottom:8 }}>{job.titel}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <Avatar name={job.kunde} />
+        <span style={{ fontSize:11, color: T.textSm }}>{job.kunde.split(' ')[0]}</span>
       </div>
     </div>
   );
 }
 
-function KanbanCol({ status, jobs, onJobClick }: { status: Status; jobs: Job[]; onJobClick: (j: Job) => void }) {
-  const { label, color } = STATUS[status];
+function KanbanCol({ status, jobs, onJobClick }: { status:Status; jobs:Job[]; onJobClick:(j:Job)=>void }) {
+  const { label, color, bg, border } = S[status];
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <div className="shrink-0 flex flex-col gap-2" style={{ width: 200 }}>
-      <div className="flex items-center justify-between px-1 mb-1">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-          <span className="text-xs font-bold" style={{ color:'var(--foreground)' }}>{label}</span>
+    <div style={{ width:190, flexShrink:0, display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 4px', marginBottom:4 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <span style={{ width:8, height:8, borderRadius:'50%', backgroundColor: color, display:'inline-block' }} />
+          <span style={{ fontSize:12, fontWeight:700, color: T.text }}>{label}</span>
         </div>
-        <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: color + '22', color }}>{jobs.length}</span>
+        <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:12, backgroundColor: bg, color, border:`1px solid ${border}` }}>{jobs.length}</span>
       </div>
-      <div
-        ref={setNodeRef}
-        className="flex flex-col gap-2 rounded-xl p-2 transition-colors min-h-[180px]"
-        style={{
-          backgroundColor: isOver ? color + '10' : 'rgba(255,255,255,0.025)',
-          border: `1px solid ${isOver ? color + '55' : 'var(--border)'}`,
-        }}
-      >
-        {jobs.map(j => <KanbanCard key={j.id} job={j} onJobClick={() => onJobClick(j)} />)}
+      <div ref={setNodeRef} style={{
+        display:'flex', flexDirection:'column', gap:7,
+        minHeight:160, borderRadius:12, padding:8,
+        backgroundColor: isOver ? bg : T.grayBg,
+        border: `1.5px dashed ${isOver ? color : T.border}`,
+        transition:'all 0.15s',
+      }}>
+        {jobs.map(j => <KanbanCard key={j.id} job={j} onClick={() => onJobClick(j)} />)}
       </div>
     </div>
   );
 }
 
-function KanbanTab({ jobs, onChange }: { jobs: Job[]; onChange: (id: string, s: Status) => void }) {
-  const [active, setActive] = useState<Job | null>(null);
-  const [selected, setSelected] = useState<Job | null>(null);
+function KanbanTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:Status)=>void }) {
+  const [active, setActive]   = useState<Job|null>(null);
+  const [selected, setSelected] = useState<Job|null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor,   { activationConstraint: { delay: 200, tolerance: 8 } })
+    useSensor(PointerSensor,{ activationConstraint:{ distance:8 } }),
+    useSensor(TouchSensor,  { activationConstraint:{ delay:200, tolerance:8 } })
   );
-  const onDragStart = (e: DragStartEvent) => setActive(jobs.find(j => j.id === e.active.id) ?? null);
-  const onDragEnd   = (e: DragEndEvent)   => {
-    setActive(null);
-    const ns = ORDER.find(s => s === e.over?.id);
-    if (ns) onChange(e.active.id as string, ns);
-  };
-
   return (
     <>
-      <div className="overflow-x-auto -mx-4 px-4 pb-4">
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-          <div className="flex gap-3 min-w-max">
-            {ORDER.map(s => (
-              <KanbanCol key={s} status={s} jobs={jobs.filter(j => j.status === s)} onJobClick={setSelected} />
-            ))}
+      <div style={{ overflowX:'auto', margin:'0 -16px', padding:'0 16px 16px' }}>
+        <DndContext sensors={sensors}
+          onDragStart={(e:DragStartEvent) => setActive(jobs.find(j=>j.id===e.active.id)??null)}
+          onDragEnd={(e:DragEndEvent)   => { setActive(null); const ns=ORDER.find(s=>s===e.over?.id); if(ns) onChange(e.active.id as string,ns); }}
+        >
+          <div style={{ display:'flex', gap:12, minWidth:'max-content' }}>
+            {ORDER.map(s => <KanbanCol key={s} status={s} jobs={jobs.filter(j=>j.status===s)} onJobClick={setSelected} />)}
           </div>
           <DragOverlay>
             {active && (
-              <div className="rounded-xl p-3 shadow-2xl rotate-2" style={{ backgroundColor:'var(--card)', border:'1px solid var(--primary)', width:200 }}>
-                <p className="font-bold text-xs" style={{ color:'var(--foreground)', fontFamily:'monospace' }}>{active.kennzeichen}</p>
-                <p className="text-xs mt-1" style={{ color:'#9ca3af' }}>{active.titel}</p>
+              <div style={{ background:T.surface, border:`2px solid ${T.amber}`, borderRadius:10, padding:'10px 12px', width:190, boxShadow:T.shadowMd, transform:'rotate(2deg)' }}>
+                <div style={{ fontFamily:'monospace', fontWeight:800, fontSize:12, color:T.text }}>{active.kennzeichen}</div>
+                <div style={{ fontSize:12, color:T.textMd, marginTop:4 }}>{active.titel}</div>
               </div>
             )}
           </DragOverlay>
         </DndContext>
       </div>
 
-      {/* Job detail modal */}
+      {/* Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ backgroundColor:'rgba(0,0,0,0.75)' }} onClick={() => setSelected(null)}>
-          <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ backgroundColor:'var(--card)', border:'1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
-            {/* Color bar */}
-            <div className="h-1" style={{ backgroundColor: STATUS[selected.status].color }} />
-            <div className="p-5 space-y-4">
-              <div className="flex items-start justify-between gap-3">
+        <div style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:16, backgroundColor:'rgba(0,0,0,0.4)', backdropFilter:'blur(4px)' }} onClick={() => setSelected(null)}>
+          <div style={{ background:T.surface, borderRadius:20, width:'100%', maxWidth:400, overflow:'hidden', boxShadow:T.shadowMd }} onClick={e => e.stopPropagation()}>
+            <div style={{ height:4, backgroundColor: S[selected.status].color }} />
+            <div style={{ padding:20 }}>
+              {/* Header */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
                 <div>
-                  <p className="text-2xl font-black tracking-wider" style={{ color:'var(--foreground)', fontFamily:'monospace' }}>{selected.kennzeichen}</p>
-                  <p className="text-sm mt-0.5" style={{ color:'#9ca3af' }}>{selected.titel}</p>
+                  <div style={{ fontFamily:'monospace', fontSize:22, fontWeight:900, color:T.text, letterSpacing:'0.05em' }}>{selected.kennzeichen}</div>
+                  <div style={{ fontSize:13, color:T.textMd, marginTop:3 }}>{selected.titel}</div>
                 </div>
-                <StatusPill status={selected.status} />
+                <button onClick={() => setSelected(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.textSm, padding:4 }}><X size={18}/></button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-3" style={{ backgroundColor:'rgba(255,255,255,0.04)', border:'1px solid var(--border)' }}>
-                  <p className="text-xs mb-1" style={{ color:'#6b6b78' }}>Kunde</p>
-                  <p className="text-sm font-semibold" style={{ color:'var(--foreground)' }}>{selected.kunde}</p>
-                </div>
-                <div className="rounded-xl p-3" style={{ backgroundColor:'rgba(255,255,255,0.04)', border:'1px solid var(--border)' }}>
-                  <p className="text-xs mb-1" style={{ color:'#6b6b78' }}>Priorität</p>
-                  <p className="text-sm font-semibold" style={{ color: selected.priority==='urgent'?'#ef4444':selected.priority==='high'?'#f97316':'#6b6b78' }}>
-                    {selected.priority==='urgent'?'🔴 Dringend':selected.priority==='high'?'🟠 Hoch':'Normal'}
-                  </p>
-                </div>
+              {/* Info Grid */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+                {[
+                  { label:'Kunde',     value:selected.kunde },
+                  { label:'Status',    value:<StatusBadge status={selected.status}/> },
+                  { label:'Telefon',   value:selected.telefon },
+                  { label:'Priorität', value: selected.priority==='urgent'?'🔴 Dringend':selected.priority==='high'?'🟠 Hoch':'✅ Normal' },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ background:T.bg, borderRadius:10, padding:'10px 12px', border:`1px solid ${T.border}` }}>
+                    <div style={{ fontSize:11, color:T.textSm, marginBottom:4, fontWeight:600 }}>{label}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{value}</div>
+                  </div>
+                ))}
               </div>
-              {/* Next status buttons */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold" style={{ color:'#6b6b78' }}>Status ändern →</p>
-                <div className="flex flex-wrap gap-2">
-                  {ORDER.filter(s => s !== selected.status).slice(0,4).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => { onChange(selected.id, s); setSelected(null); }}
-                      className="text-xs font-bold px-3 py-2 rounded-xl transition-colors"
-                      style={{ backgroundColor: STATUS[s].color + '20', color: STATUS[s].color, border: `1px solid ${STATUS[s].color}40` }}
-                    >
-                      {STATUS[s].label}
+              {/* Status ändern */}
+              <div style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:T.textSm, marginBottom:8 }}>STATUS ÄNDERN</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
+                  {ORDER.filter(s => s!==selected.status).map(s => (
+                    <button key={s} onClick={() => { onChange(selected.id,s); setSelected(null); }} style={{
+                      fontSize:12, fontWeight:700, padding:'6px 12px', borderRadius:8, cursor:'pointer',
+                      backgroundColor: S[s].bg, color: S[s].color, border:`1px solid ${S[s].border}`,
+                    }}>
+                      {S[s].label}
                     </button>
                   ))}
                 </div>
               </div>
-              <a
-                href={`tel:${selected.telefon}`}
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold text-sm"
-                style={{ backgroundColor:'rgba(59,130,246,0.12)', color:'#3b82f6', border:'1px solid rgba(59,130,246,0.25)' }}
-              >
-                <Phone className="w-4 h-4" /> {selected.telefon} anrufen
+              {/* Anrufen */}
+              <a href={`tel:${selected.telefon}`} style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                padding:'14px', borderRadius:12, backgroundColor: T.blueBg,
+                border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none',
+                fontWeight:700, fontSize:14,
+              }}>
+                <Phone size={16}/> {selected.kunde} anrufen
               </a>
             </div>
           </div>
@@ -331,52 +358,65 @@ function KanbanTab({ jobs, onChange }: { jobs: Job[]; onChange: (id: string, s: 
 }
 
 // ─── Termine-Tab ──────────────────────────────────────────────────────────────
-
-function TermineTab() {
+function TermineTab({ onTerminToJob }: { onTerminToJob: () => void }) {
   const tage = [...new Set(TERMINE.map(t => t.tag))];
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl p-4 flex items-start gap-3" style={{ backgroundColor:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>
-        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color:'var(--primary)' }} />
+    <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+      {/* Info */}
+      <div style={{ background: T.amberBg, border:`1px solid ${T.amberBd}`, borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'flex-start', gap:12 }}>
+        <Bell size={16} color={T.amber} style={{ flexShrink:0, marginTop:1 }} />
         <div>
-          <p className="text-sm font-semibold" style={{ color:'var(--primary)' }}>Demo-Kalender</p>
-          <p className="text-xs mt-0.5" style={{ color:'#9ca3af' }}>Im echten System: Termin anlegen → bei Ankunft 1 Klick → wird automatisch zum Auftrag im Kanban</p>
+          <div style={{ fontSize:13, fontWeight:700, color: T.amber, marginBottom:3 }}>So funktioniert der Workflow</div>
+          <div style={{ fontSize:12, color: T.textMd, lineHeight:1.6 }}>
+            Termin anlegen → Kunde kommt → <strong>„Auftrag erstellen"</strong> klicken → Fahrzeug erscheint automatisch im Kanban → SMS geht automatisch raus bei jedem Status
+          </div>
         </div>
       </div>
-
+      {/* Kalender */}
       {tage.map(tag => {
-        const termine = TERMINE.filter(t => t.tag === tag);
-        const isHeute = tag === 'Montag'; // Montag = heute im Demo
+        const items = TERMINE.filter(t => t.tag === tag);
+        const isHeute = items[0].heute;
         return (
           <div key={tag}>
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-sm font-bold" style={{ color: isHeute ? 'var(--primary)' : 'var(--foreground)' }}>{tag}</span>
-              <span className="text-xs" style={{ color:'#6b6b78' }}>{termine[0].datum}</span>
-              {isHeute && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor:'rgba(245,158,11,0.2)', color:'var(--primary)' }}>Heute</span>}
-              <div className="flex-1 h-px" style={{ backgroundColor:'var(--border)' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+              <div style={{ fontWeight:700, fontSize:14, color: isHeute ? T.amber : T.text }}>{tag}</div>
+              <div style={{ fontSize:12, color: T.textSm }}>{items[0].datum}</div>
+              {isHeute && <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:12, backgroundColor: T.amberBg, color: T.amber, border:`1px solid ${T.amberBd}` }}>Heute</span>}
+              <div style={{ flex:1, height:1, backgroundColor: T.border }} />
             </div>
-            <div className="space-y-2">
-              {termine.map(t => (
-                <div key={t.id} className="flex items-center gap-4 rounded-xl p-4" style={{ backgroundColor:'var(--card)', border:'1px solid var(--border)' }}>
-                  <div className="w-14 shrink-0 text-center">
-                    <p className="text-sm font-black" style={{ color: isHeute ? 'var(--primary)' : 'var(--foreground)' }}>{t.uhrzeit}</p>
-                    <p className="text-xs" style={{ color:'#6b6b78' }}>Uhr</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {items.map(t => (
+                <div key={t.id} style={{
+                  background: T.surface, border: `1px solid ${isHeute ? T.amberBd : T.border}`,
+                  borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:14,
+                  boxShadow: T.shadow, borderLeft: `4px solid ${isHeute ? T.amber : T.border}`,
+                }}>
+                  <div style={{ minWidth:48, textAlign:'center' }}>
+                    <div style={{ fontSize:14, fontWeight:800, color: isHeute ? T.amber : T.text }}>{t.uhrzeit}</div>
+                    <div style={{ fontSize:10, color: T.textSm }}>Uhr</div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color:'var(--foreground)' }}>{t.kunde}</p>
-                    <p className="text-xs" style={{ color:'#9ca3af' }}>
-                      <span style={{ fontFamily:'monospace' }}>{t.kennzeichen}</span>
-                      {' · '}{t.grund}
-                    </p>
+                  <Avatar name={t.kunde} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color: T.text }}>{t.kunde}</div>
+                    <div style={{ fontSize:12, color: T.textSm, marginTop:2 }}>
+                      <span style={{ fontFamily:'monospace', fontWeight:700 }}>{t.kennzeichen}</span>
+                      {' — '}{t.grund}
+                    </div>
                   </div>
-                  {isHeute && (
-                    <button
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
-                      style={{ backgroundColor:'rgba(34,197,94,0.15)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.25)' }}
-                    >
-                      <Plus className="w-3 h-3" /> Auftrag
-                    </button>
-                  )}
+                  <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                    <a href={`tel:+49711111111`} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:38, height:38, borderRadius:9, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none' }}>
+                      <Phone size={15}/>
+                    </a>
+                    {isHeute && (
+                      <button onClick={onTerminToJob} style={{
+                        display:'flex', alignItems:'center', gap:6, padding:'0 14px', height:38,
+                        borderRadius:9, backgroundColor: T.green, border:'none', color:'#fff',
+                        fontSize:12, fontWeight:700, cursor:'pointer',
+                      }}>
+                        <Plus size={13}/> Auftrag
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -387,105 +427,118 @@ function TermineTab() {
   );
 }
 
-// ─── Hauptkomponente ──────────────────────────────────────────────────────────
-
-type Tab = 'heute' | 'auftraege' | 'termine';
+// ─── Haupt-Komponente ─────────────────────────────────────────────────────────
+type Tab = 'heute'|'auftraege'|'termine';
 
 export function DemoDashboard() {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const [jobs, setJobs] = useState<Job[]>(INIT);
-  const [tab, setTab] = useState<Tab>('heute');
+  const [tab, setTab]   = useState<Tab>('heute');
+  const [toast, setToast] = useState<string|null>(null);
 
-  const onChange = (id: string, s: Status) => setJobs(prev => prev.map(j => j.id === id ? { ...j, status: s } : j));
+  const onChange = (id:string, s:Status) => {
+    setJobs(prev => prev.map(j => j.id===id ? { ...j, status:s, smsGesendet: s==='abholbereit'||s==='abgeholt' } : j));
+    if (s === 'abholbereit') {
+      setToast('📱 SMS an Kunde gesendet: „Ihr Fahrzeug ist abholbereit!"');
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
 
-  const open       = jobs.filter(j => j.status !== 'abgeholt').length;
+  const open        = jobs.filter(j => j.status !== 'abgeholt').length;
   const abholbereit = jobs.filter(j => j.status === 'abholbereit').length;
-  const urgent     = jobs.filter(j => j.priority === 'urgent' && j.status !== 'abgeholt').length;
+  const urgent      = jobs.filter(j => j.priority==='urgent' && j.status!=='abgeholt').length;
 
-  const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key:'heute',     label:'Heute',    icon: Clock        },
+  const TABS: { key:Tab; label:string; icon:React.ElementType }[] = [
+    { key:'heute',     label:'Heute',    icon: Clock },
     { key:'auftraege', label:'Aufträge', icon: List },
     { key:'termine',   label:'Termine',  icon: CalendarDays },
   ];
 
   return (
-    <div className="min-h-screen pb-8" style={{ backgroundColor:'var(--background)' }}>
+    <div style={{ minHeight:'100vh', backgroundColor: T.bg, fontFamily:'system-ui,-apple-system,sans-serif' }}>
 
-      {/* ── Topbar ── */}
-      <div className="sticky top-0 z-40" style={{ backgroundColor:'var(--card)', borderBottom:'1px solid var(--border)' }}>
-        <div className="flex items-center justify-between px-5 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ backgroundColor:'var(--primary)' }}>
-              <Wrench className="w-4 h-4 text-black" />
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:100, backgroundColor: T.green, color:'#fff', padding:'12px 20px', borderRadius:12, fontSize:13, fontWeight:600, boxShadow:T.shadowMd, whiteSpace:'nowrap' }}>
+          {toast}
+        </div>
+      )}
+
+      {/* ── Header ── */}
+      <div style={{ backgroundColor: T.surface, borderBottom:`1px solid ${T.border}`, position:'sticky', top:0, zIndex:40 }}>
+        <div style={{ maxWidth:960, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:10, backgroundColor: T.amber, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Wrench size={18} color="#000"/>
             </div>
             <div>
-              <p className="text-sm font-bold leading-none" style={{ color:'var(--foreground)' }}>Werkstatt-Pilot</p>
-              <p className="text-xs mt-0.5" style={{ color:'var(--primary)' }}>Demo-Modus</p>
+              <div style={{ fontSize:15, fontWeight:800, color: T.text, lineHeight:1.2 }}>Werkstatt-Pilot</div>
+              <div style={{ fontSize:11, color: T.amber, fontWeight:600 }}>Muster KFZ Waiblingen</div>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/register')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
-            style={{ backgroundColor:'var(--primary)', color:'#000' }}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            Kostenlos starten
+          <button onClick={() => navigate('/register')} style={{
+            display:'flex', alignItems:'center', gap:7, padding:'9px 16px',
+            backgroundColor: T.amber, border:'none', borderRadius:10,
+            fontSize:13, fontWeight:700, color:'#000', cursor:'pointer',
+          }}>
+            Kostenlos starten <ArrowRight size={14}/>
           </button>
         </div>
 
-        {/* ── KPI-Zeile ── */}
-        <div className="grid grid-cols-3 gap-px" style={{ backgroundColor:'var(--border)' }}>
+        {/* ── KPIs ── */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', borderTop:`1px solid ${T.border}` }}>
           {[
-            { label:'Offene Aufträge', value:open,        color:'#f59e0b' },
-            { label:'Abholbereit',    value:abholbereit,  color:'#22c55e' },
-            { label:'Dringend',       value:urgent,       color:'#ef4444' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="flex flex-col items-center py-3" style={{ backgroundColor:'var(--card)' }}>
-              <p className="text-2xl font-black" style={{ color }}>{value}</p>
-              <p className="text-xs mt-0.5" style={{ color:'#6b6b78' }}>{label}</p>
+            { label:'Offene Aufträge', value:open,         color:T.amber, bg: T.amberBg },
+            { label:'Abholbereit',     value:abholbereit,  color:T.green, bg: T.greenBg },
+            { label:'Dringend',        value:urgent,       color:T.red,   bg: T.redBg   },
+          ].map(({ label, value, color, bg }, i) => (
+            <div key={label} style={{
+              display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 8px',
+              borderRight: i < 2 ? `1px solid ${T.border}` : undefined,
+              backgroundColor: bg,
+            }}>
+              <div style={{ fontSize:26, fontWeight:900, color, lineHeight:1 }}>{value}</div>
+              <div style={{ fontSize:11, color: T.textSm, marginTop:3, fontWeight:500 }}>{label}</div>
             </div>
           ))}
         </div>
 
         {/* ── Tabs ── */}
-        <div className="flex" style={{ backgroundColor:'var(--background)' }}>
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors relative"
-              style={{ color: tab===key ? 'var(--primary)' : '#6b6b78' }}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-              {tab === key && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor:'var(--primary)' }} />
-              )}
-            </button>
-          ))}
+        <div style={{ display:'flex', borderTop:`1px solid ${T.border}` }}>
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const active = tab === key;
+            return (
+              <button key={key} onClick={() => setTab(key)} style={{
+                flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+                padding:'11px 0', fontSize:13, fontWeight: active ? 700 : 500,
+                color: active ? T.amber : T.textMd, border:'none', cursor:'pointer',
+                backgroundColor:'transparent', borderBottom: active ? `2px solid ${T.amber}` : '2px solid transparent',
+                transition:'all 0.15s',
+              }}>
+                <Icon size={15}/> {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Content ── */}
-      <div className="px-4 pt-5 max-w-3xl mx-auto">
-
-        {/* Demo banner */}
-        <div className="rounded-xl p-3.5 mb-5 flex items-center justify-between gap-3" style={{ backgroundColor:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.2)' }}>
-          <div className="flex items-center gap-2.5">
-            <Star className="w-4 h-4 shrink-0" style={{ color:'var(--primary)' }} />
-            <p className="text-xs" style={{ color:'#a0a0a8' }}>
-              <span className="font-semibold" style={{ color:'var(--foreground)' }}>Echte Demo — </span>
-              Karten verschieben, Status ändern, Anrufen klicken
-            </p>
-          </div>
-          <button onClick={() => navigate('/register')} className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg" style={{ backgroundColor:'var(--primary)', color:'#000' }}>
-            Meine Werkstatt
+      {/* ── Demo Banner ── */}
+      <div style={{ maxWidth:960, margin:'0 auto', padding:'16px 16px 0' }}>
+        <div style={{ background: T.amberBg, border:`1px solid ${T.amberBd}`, borderRadius:12, padding:'11px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:20 }}>
+          <p style={{ fontSize:13, color: T.textMd, margin:0 }}>
+            <strong style={{ color: T.text }}>Demo-Modus</strong> — Karten verschieben, Status ändern, Anrufen testen
+          </p>
+          <button onClick={() => navigate('/register')} style={{ flexShrink:0, fontSize:12, fontWeight:700, padding:'7px 14px', borderRadius:8, backgroundColor: T.amber, border:'none', color:'#000', cursor:'pointer' }}>
+            Meine Werkstatt anlegen
           </button>
         </div>
 
-        {tab === 'heute'     && <HeuteTab jobs={jobs} onStatusChange={onChange} />}
-        {tab === 'auftraege' && <KanbanTab jobs={jobs} onChange={onChange} />}
-        {tab === 'termine'   && <TermineTab />}
+        {/* ── Content ── */}
+        <div style={{ paddingBottom:40 }}>
+          {tab === 'heute'     && <HeuteTab  jobs={jobs} onChange={onChange} />}
+          {tab === 'auftraege' && <KanbanTab jobs={jobs} onChange={onChange} />}
+          {tab === 'termine'   && <TermineTab onTerminToJob={() => { setTab('heute'); setToast('✅ Auftrag aus Termin erstellt!'); setTimeout(()=>setToast(null),3000); }} />}
+        </div>
       </div>
     </div>
   );
