@@ -136,7 +136,7 @@ function JobRow({ job, actionLabel, actionColor, onAction }: {
             <MessageSquare size={12} /> SMS ✓
           </span>
         )}
-        <a href={`tel:${job.telefon}`} style={{
+        <a href={`tel:${job.telefon}`} className="tel-btn" style={{
           display:'flex', alignItems:'center', justifyContent:'center',
           width:40, height:40, borderRadius:10, backgroundColor: T.blueBg,
           border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none',
@@ -268,6 +268,7 @@ function AuftraegeTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:St
                         )}
                         <a
                           href={`tel:${job.telefon}`}
+                          className="tel-btn"
                           onClick={e => e.stopPropagation()}
                           style={{ display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:9, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none', flexShrink:0 }}
                         >
@@ -326,7 +327,7 @@ function AuftraegeTab({ jobs, onChange }: { jobs:Job[]; onChange:(id:string,s:St
                   ))}
                 </div>
               </div>
-              <a href={`tel:${selected.telefon}`} style={{
+              <a href={`tel:${selected.telefon}`} className="tel-btn" style={{
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'14px',
                 borderRadius:12, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`,
                 color: T.blue, textDecoration:'none', fontWeight:700, fontSize:14,
@@ -388,7 +389,7 @@ function TermineTab({ onTerminToJob }: { onTerminToJob: () => void }) {
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                    <a href={`tel:+49711111111`} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:38, height:38, borderRadius:9, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none' }}>
+                    <a href={`tel:+49711111111`} className="tel-btn" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:38, height:38, borderRadius:9, backgroundColor: T.blueBg, border:`1px solid ${T.blueBd}`, color: T.blue, textDecoration:'none' }}>
                       <Phone size={15}/>
                     </a>
                     {isHeute && (
@@ -440,6 +441,7 @@ export function DemoDashboard() {
 
   return (
     <div style={{ minHeight:'100vh', backgroundColor: T.bg, fontFamily:'system-ui,-apple-system,sans-serif' }}>
+      <style>{`@media(min-width:768px){.tel-btn{display:none!important;}}`}</style>
 
       {/* ── Toast ── */}
       {toast && (

@@ -41,14 +41,10 @@ function getSmsText(
   const k = kennzeichen;
   const w = werkstatt;
   switch (status) {
-    case 'annahme':
-      return `Hallo ${n}, Ihr Fahrzeug ${k} wurde bei uns angenommen. Wir melden uns nach der Diagnose. Ihr Team von ${w}`;
     case 'teile_bestellt':
-      return `Hallo ${n}, die benötigten Teile für ${k} wurden bestellt. Wir informieren Sie sobald die Reparatur beginnt. Ihr Team von ${w}`;
-    case 'reparatur':
-      return `Hallo ${n}, die Reparatur an Ihrem ${k} hat begonnen. Ihr Team von ${w}`;
+      return `Hallo ${n}, die benötigten Teile für ${k} wurden bestellt. Wir melden uns sobald Ihr Fahrzeug fertig ist. Ihr Team von ${w}`;
     case 'abholbereit':
-      return `Hallo ${n}, gute Nachricht! Ihr Fahrzeug ${k} ist abholbereit. Bitte kommen Sie zu unseren Öffnungszeiten vorbei. Ihr Team von ${w}`;
+      return `Hallo ${n}, gute Nachricht! 🎉 Ihr Fahrzeug ${k} ist fertig repariert und kann abgeholt werden. Bitte kommen Sie zu unseren Öffnungszeiten vorbei. Ihr Team von ${w}`;
     default:
       return null;
   }
