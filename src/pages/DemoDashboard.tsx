@@ -370,21 +370,168 @@ function TermineTab({ onTerminToJob }: { onTerminToJob: () => void }) {
   );
 }
 
+// ─── Quick-Capture Modal ──────────────────────────────────────────────────────
+function QuickCapture({
+  jobs, onClose, onCreate,
+}: {
+  jobs: Job[];
+  onClose: () => void;
+  onCreate: (kenn: string, name: string, tel: string) => void;
+}) {
+  const [kenn, setKenn]   = useState('');
+  const [name, setName]   = useState('');
+  const [tel,  setTel]    = useState('');
+  const [autofilled, setAutofilled] = useState(false);
+
+  const handleKennChange = (v: string) => {
+    const upper = v.toUpperCase();
+    setKenn(upper);
+    // Autofill aus bestehendem Kunden
+    const match = jobs.find(j => j.kennzeichen.replace(/\s/g,'') === upper.replace(/\s/g,''));
+    if (match) {
+      setName(match.kunde);
+      setTel(match.telefon);
+      setAutofilled(true);
+    } else if (autofilled) {
+      setName('');
+      setTel('');
+      setAutofilled(false);
+    }
+  };
+
+  const valid = kenn.trim().length >= 3 && name.trim().length >= 2;
+
+  return (
+    <div
+      style={{ position:'fixed', inset:0, zIndex:60, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:16, backgroundColor:'rgba(0,0,0,0.35)', backdropFilter:'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background:T.surface, borderRadius:24, width:'100%', maxWidth:440, overflow:'hidden', boxShadow:T.shadowLg }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Titel */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 20px 16px' }}>
+          <span style={{ fontSize:17, fontWeight:700, color:T.text }}>Neuer Auftrag</span>
+          <button onClick={onClose} style={{ background:T.bg, border:'none', cursor:'pointer', color:T.textSm, padding:'6px 8px', borderRadius:20 }}>
+            <X size={15}/>
+          </button>
+        </div>
+
+        <div style={{ padding:'0 20px 20px', display:'flex', flexDirection:'column', gap:12 }}>
+          {/* Kennzeichen */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:600, color:T.textSm, textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>
+              Kennzeichen
+            </label>
+            <input
+              autoFocus
+              value={kenn}
+              onChange={e => handleKennChange(e.target.value)}
+              placeholder="S-AB 1234"
+              style={{
+                width:'100%', boxSizing:'border-box', padding:'14px 16px',
+                fontFamily:'ui-monospace,"SF Mono",monospace', fontSize:22, fontWeight:700,
+                color:T.text, background:T.bg, border:'none', borderRadius:14,
+                letterSpacing:'0.06em', outline:'none',
+              }}
+            />
+            {autofilled && (
+              <div style={{ fontSize:12, color:T.green, marginTop:5, fontWeight:500 }}>
+                ✓ Kunde aus bestehendem Auftrag erkannt
+              </div>
+            )}
+          </div>
+
+          {/* Name */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:600, color:T.textSm, textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>
+              Kundenname
+            </label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Max Mustermann"
+              style={{
+                width:'100%', boxSizing:'border-box', padding:'12px 16px', fontSize:15, fontWeight:500,
+                color:T.text, background:autofilled ? '#f0fdf4' : T.bg, border:'none', borderRadius:14, outline:'none',
+              }}
+            />
+          </div>
+
+          {/* Telefon */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:600, color:T.textSm, textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>
+              Telefon
+            </label>
+            <input
+              value={tel}
+              onChange={e => setTel(e.target.value)}
+              placeholder="+49 711 ..."
+              type="tel"
+              style={{
+                width:'100%', boxSizing:'border-box', padding:'12px 16px', fontSize:15, fontWeight:500,
+                color:T.text, background:autofilled ? '#f0fdf4' : T.bg, border:'none', borderRadius:14, outline:'none',
+              }}
+            />
+          </div>
+
+          {/* Erstellen */}
+          <button
+            disabled={!valid}
+            onClick={() => onCreate(kenn.trim(), name.trim(), tel.trim())}
+            style={{
+              width:'100%', minHeight:52, marginTop:4,
+              background: valid ? T.blue : T.bg,
+              border:'none', borderRadius:16, cursor: valid ? 'pointer' : 'not-allowed',
+              color: valid ? '#fff' : T.textSm,
+              fontSize:15, fontWeight:700, transition:'opacity 0.12s',
+            }}
+          >
+            Auftrag erstellen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 type Tab = 'heute'|'auftraege'|'termine';
 
 export function DemoDashboard() {
   const navigate  = useNavigate();
-  const [jobs, setJobs]   = useState<Job[]>(INIT);
-  const [tab, setTab]     = useState<Tab>('heute');
-  const [toast, setToast] = useState<string|null>(null);
+  const [jobs, setJobs]       = useState<Job[]>(INIT);
+  const [tab, setTab]         = useState<Tab>('heute');
+  const [toast, setToast]     = useState<string|null>(null);
+  const [showCapture, setShowCapture] = useState(false);
+  const [nextId, setNextId]   = useState(100);
 
   const onChange = (id:string, s:Status) => {
     setJobs(prev => prev.map(j => j.id===id ? { ...j, status:s, smsGesendet: s==='abholbereit'||s==='abgeholt' } : j));
     if (s === 'abholbereit') {
-      setToast('SMS gesendet: „Ihr Fahrzeug ist abholbereit!"');
+      setToast('💬 WhatsApp gesendet: „Ihr Fahrzeug ist abholbereit!"');
       setTimeout(() => setToast(null), 4000);
     }
+  };
+
+  const onCreateJob = (kenn: string, name: string, tel: string) => {
+    const newJob: Job = {
+      id: String(nextId),
+      kennzeichen: kenn,
+      kunde: name || 'Unbekannt',
+      telefon: tel || '',
+      titel: 'Neu aufgenommen',
+      status: 'annahme',
+      priority: 'normal',
+      uhrzeit: new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
+    };
+    setJobs(prev => [newJob, ...prev]);
+    setNextId(n => n + 1);
+    setShowCapture(false);
+    setTab('heute');
+    setToast(`Auftrag ${kenn} erstellt`);
+    setTimeout(() => setToast(null), 3000);
   };
 
   const open        = jobs.filter(j => j.status !== 'abgeholt').length;
@@ -475,12 +622,39 @@ export function DemoDashboard() {
         </div>
 
         {/* Content */}
-        <div style={{ paddingBottom:48 }}>
+        <div style={{ paddingBottom:96 }}>
           {tab === 'heute'     && <HeuteTab     jobs={jobs} onChange={onChange} />}
           {tab === 'auftraege' && <AuftraegeTab jobs={jobs} onChange={onChange} />}
           {tab === 'termine'   && <TermineTab   onTerminToJob={() => { setTab('heute'); setToast('Auftrag aus Termin erstellt'); setTimeout(()=>setToast(null),3000); }} />}
         </div>
       </div>
+
+      {/* Floating Quick-Capture Button */}
+      <button
+        onClick={() => setShowCapture(true)}
+        title="Neuer Auftrag"
+        style={{
+          position:'fixed', bottom:28, right:24, zIndex:50,
+          width:58, height:58, borderRadius:'50%',
+          backgroundColor:T.blue, border:'none', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          boxShadow:'0 6px 24px rgba(0,122,255,0.4)',
+          transition:'transform 0.15s, box-shadow 0.15s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 32px rgba(0,122,255,0.5)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(0,122,255,0.4)'; }}
+      >
+        <Plus size={26} color="#fff" strokeWidth={2.5}/>
+      </button>
+
+      {/* Quick-Capture Modal */}
+      {showCapture && (
+        <QuickCapture
+          jobs={jobs}
+          onClose={() => setShowCapture(false)}
+          onCreate={onCreateJob}
+        />
+      )}
     </div>
   );
 }

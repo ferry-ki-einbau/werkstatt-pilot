@@ -107,19 +107,9 @@ function getReviewEmail(
 </html>`;
 }
 
-async function sendSMS(to: string, body: string): Promise<void> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_PHONE_NUMBER;
-
-  if (!accountSid || !authToken || !from || accountSid.startsWith('AC_placeholder')) {
-    console.log('[notify] SMS skipped — Twilio not configured');
-    return;
-  }
-
+async function sendTwilioMessage(to: string, from: string, body: string, accountSid: string, authToken: string): Promise<void> {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   const params = new URLSearchParams({ To: to, From: from, Body: body });
-
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -128,11 +118,40 @@ async function sendSMS(to: string, body: string): Promise<void> {
     },
     body: params.toString(),
   });
-
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Twilio error: ${err}`);
   }
+}
+
+async function sendWhatsAppOrSMS(to: string, body: string): Promise<'whatsapp'|'sms'|'skipped'> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken  = process.env.TWILIO_AUTH_TOKEN;
+
+  if (!accountSid || !authToken || accountSid.startsWith('AC_placeholder')) {
+    console.log('[notify] Messaging skipped — Twilio not configured');
+    return 'skipped';
+  }
+
+  // Try WhatsApp first if a WhatsApp-enabled number is configured
+  const waFrom = process.env.TWILIO_WHATSAPP_NUMBER;
+  if (waFrom) {
+    try {
+      await sendTwilioMessage(`whatsapp:${to}`, `whatsapp:${waFrom}`, body, accountSid, authToken);
+      return 'whatsapp';
+    } catch (err) {
+      console.warn('[notify] WhatsApp failed, falling back to SMS:', err);
+    }
+  }
+
+  // Fallback: regular SMS
+  const smsFrom = process.env.TWILIO_PHONE_NUMBER;
+  if (!smsFrom) {
+    console.log('[notify] SMS skipped — TWILIO_PHONE_NUMBER not configured');
+    return 'skipped';
+  }
+  await sendTwilioMessage(to, smsFrom, body, accountSid, authToken);
+  return 'sms';
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -146,15 +165,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const results: Record<string, string> = {};
 
   try {
-    // SMS for applicable statuses
+    // WhatsApp/SMS for applicable statuses
     const smsText = getSmsText(newStatus, customerName, kennzeichen, werkstattName);
     if (smsText && customerPhone) {
       try {
-        await sendSMS(customerPhone, smsText);
-        results.sms = 'sent';
+        const channel = await sendWhatsAppOrSMS(customerPhone, smsText);
+        results.message = channel;
       } catch (err) {
-        console.error('[notify] SMS failed:', err);
-        results.sms = 'failed';
+        console.error('[notify] Messaging failed:', err);
+        results.message = 'failed';
       }
     }
 
