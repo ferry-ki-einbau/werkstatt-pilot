@@ -1,13 +1,22 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { hydrateRoot, createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element not found');
 
-createRoot(rootEl).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+if (rootEl.innerHTML.trim().length > 0 && !rootEl.innerHTML.includes('ssr-outlet')) {
+  hydrateRoot(
+    rootEl,
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+} else {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
